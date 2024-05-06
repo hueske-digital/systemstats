@@ -13,12 +13,12 @@ import (
 )
 
 type SystemInfo struct {
-	RAMUsage  float64 `json:"ramUsage"`
-	SwapUsage float64 `json:"swapUsage"`
-	DiskUsage float64 `json:"diskUsage"`
-	Load1     float64 `json:"load1"`
-	Load5     float64 `json:"load5"`
-	Load15    float64 `json:"load15"`
+	RAMUsagePercent  float64 `json:"ramUsagePercent"`
+	SwapUsagePercent float64 `json:"swapUsagePercent"`
+	DiskUsagePercent float64 `json:"diskUsagePercent"`
+	Load1            float64 `json:"load1"`
+	Load5            float64 `json:"load5"`
+	Load15           float64 `json:"load15"`
 }
 
 func getSystemInfo() (*SystemInfo, error) {
@@ -38,9 +38,9 @@ func getSystemInfo() (*SystemInfo, error) {
 			log.Printf("Error getting swap: %v", err)
 			return
 		}
-		info.RAMUsage = math.Round(virtualMem.UsedPercent)
+		info.RAMUsagePercent = math.Round(virtualMem.UsedPercent)
 		if swapMem.Total > 0 {
-			info.SwapUsage = math.Round(float64(swapMem.Used) / float64(swapMem.Total) * 100)
+			info.SwapUsagePercent = math.Round(float64(swapMem.Used) / float64(swapMem.Total) * 100)
 		}
 	}()
 
@@ -51,7 +51,7 @@ func getSystemInfo() (*SystemInfo, error) {
 			log.Printf("Error getting disk: %v", err)
 			return
 		}
-		info.DiskUsage = math.Round(diskStat.UsedPercent)
+		info.DiskUsagePercent = math.Round(diskStat.UsedPercent)
 	}()
 
 	go func() {
