@@ -4,6 +4,9 @@ services:
   app:
     image: ghcr.io/hueske-digital/systemstats:latest
     restart: unless-stopped
+    environment:
+      - HCLOUD_TOKEN
+      - HCLOUD_SERVER_ID
     networks:
       proxy_apps:
 
