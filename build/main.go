@@ -37,7 +37,6 @@ func getSystemInfo(client *hcloud.Client, serverID int, shouldCheckTraffic bool)
 	var wg sync.WaitGroup
 	wg.Add(3)
 
-	// Memory and Swap usage
 	go func() {
 		defer wg.Done()
 		virtualMem, err := mem.VirtualMemory()
@@ -56,7 +55,6 @@ func getSystemInfo(client *hcloud.Client, serverID int, shouldCheckTraffic bool)
 		}
 	}()
 
-	// Disk usage
 	go func() {
 		defer wg.Done()
 		diskStat, err := disk.Usage("/")
@@ -67,7 +65,6 @@ func getSystemInfo(client *hcloud.Client, serverID int, shouldCheckTraffic bool)
 		info.DiskUsagePercent = math.Round(diskStat.UsedPercent)
 	}()
 
-	// CPU usage
 	go func() {
 		defer wg.Done()
 		loadStat, err := load.Avg()
@@ -83,7 +80,7 @@ func getSystemInfo(client *hcloud.Client, serverID int, shouldCheckTraffic bool)
 		info.CPUUsagePercent = math.Round(loadStat.Load1 / float64(numCores) * 100)
 	}()
 
-	if shouldCheckTraffic {
+	if shouldCheckTraffic && client != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -115,13 +112,22 @@ func getSystemInfo(client *hcloud.Client, serverID int, shouldCheckTraffic bool)
 func main() {
 	token := os.Getenv("HCLOUD_TOKEN")
 	serverIDStr := os.Getenv("HCLOUD_SERVER_ID")
-	serverID, err := strconv.Atoi(serverIDStr)
-	if err != nil {
-		log.Fatalf("Invalid server ID: %v", err)
-	}
-	shouldCheckTraffic := token != "" && serverIDStr != ""
+	var client *hcloud.Client
+	var shouldCheckTraffic bool
+	var serverID int
+	var err error
 
-	client := hcloud.NewClient(hcloud.WithToken(token))
+	if token != "" && serverIDStr != "" {
+		serverID, err = strconv.Atoi(serverIDStr)
+		if err != nil {
+			log.Fatalf("Invalid server ID: %v", err)
+		}
+		client = hcloud.NewClient(hcloud.WithToken(token))
+		shouldCheckTraffic = true
+	} else {
+		log.Println("Hetzner-API deactivated, because no Token and Server-ID is provided")
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		info, err := getSystemInfo(client, serverID, shouldCheckTraffic)
 		if err != nil {
@@ -136,6 +142,7 @@ func main() {
 			return
 		}
 	})
+
 	log.Println("Running on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
