@@ -5,31 +5,26 @@ import (
 	"log"
 	"math"
 	"net/http"
-	"os"
 	"sync"
 
 	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/load"
 	"github.com/shirou/gopsutil/mem"
 )
 
 type SystemInfo struct {
-	Hostname  string  `json:"hostname"`
 	RAMUsage  float64 `json:"ramUsage"`
 	SwapUsage float64 `json:"swapUsage"`
 	DiskUsage float64 `json:"diskUsage"`
+	Load1     float64 `json:"load1"`
+	Load5     float64 `json:"load5"`
+	Load15    float64 `json:"load15"`
 }
 
 func getSystemInfo() (*SystemInfo, error) {
 	info := &SystemInfo{}
 	var wg sync.WaitGroup
-	wg.Add(2)
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Printf("Error getting hostname: %v", err)
-		hostname = "unknown"
-	}
-	info.Hostname = hostname
+	wg.Add(3)
 
 	go func() {
 		defer wg.Done()
@@ -57,6 +52,18 @@ func getSystemInfo() (*SystemInfo, error) {
 			return
 		}
 		info.DiskUsage = math.Round(diskStat.UsedPercent)
+	}()
+
+	go func() {
+		defer wg.Done()
+		loadStat, err := load.Avg()
+		if err != nil {
+			log.Printf("Error getting load averages: %v", err)
+			return
+		}
+		info.Load1 = math.Round(loadStat.Load1)
+		info.Load5 = math.Round(loadStat.Load5)
+		info.Load15 = math.Round(loadStat.Load15)
 	}()
 
 	wg.Wait()
