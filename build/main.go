@@ -5,11 +5,13 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/load"
 	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
 )
 
 type SystemInfo struct {
@@ -19,12 +21,14 @@ type SystemInfo struct {
 	Load1            float64 `json:"load1"`
 	Load5            float64 `json:"load5"`
 	Load15           float64 `json:"load15"`
+	NetworkIn        float64 `json:"networkIn"`
+	NetworkOut       float64 `json:"networkOut"`
 }
 
-func getSystemInfo() (*SystemInfo, error) {
+func getSystemInfo(netInterface string) (*SystemInfo, error) {
 	info := &SystemInfo{}
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
@@ -66,12 +70,33 @@ func getSystemInfo() (*SystemInfo, error) {
 		info.Load15 = math.Round(loadStat.Load15)
 	}()
 
+	go func() {
+		defer wg.Done()
+		counters, err := net.IOCounters(true)
+		if err != nil {
+			log.Printf("Error getting network counters: %v", err)
+			return
+		}
+		for _, counter := range counters {
+			if counter.Name == netInterface {
+				info.NetworkIn = math.Round(float64(counter.BytesRecv) / (1024 * 1024))
+				info.NetworkOut = math.Round(float64(counter.BytesSent) / (1024 * 1024))
+				break
+			}
+		}
+	}()
+
 	wg.Wait()
 	return info, nil
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	info, err := getSystemInfo()
+	netInterface := os.Getenv("NET_INTERFACE")
+	if netInterface == "" {
+		netInterface = "eth0"
+	}
+
+	info, err := getSystemInfo(netInterface)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -80,7 +105,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(info); err != nil {
 		log.Printf("Error while encoding: %v", err)
-		http.Error(w, "Error ", http.StatusInternalServerError)
+		http.Error(w, "Error encoding JSON", http.StatusInternalServerError)
 		return
 	}
 }

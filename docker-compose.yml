@@ -4,6 +4,8 @@ services:
   app:
     image: ghcr.io/hueske-digital/systemstats:latest
     restart: unless-stopped
+    environment:
+      - NET_INTERFACE=${NET_INTERFACE:-eth0}
     networks:
       proxy_apps:
 
