@@ -4,8 +4,6 @@ services:
   app:
     image: ghcr.io/hueske-digital/systemstats:latest
     restart: unless-stopped
-    env_file:
-      - .env
     networks:
       proxy_apps:
 
