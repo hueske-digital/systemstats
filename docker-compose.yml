@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  app:
+    image: ghcr.io/hueske-digital/systemstats:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      proxy_apps:
+
+networks:
+  proxy_apps:
+    name: proxy_apps
+    external: true
