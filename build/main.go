@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"math"
 	"net/http"
@@ -31,6 +32,8 @@ var (
 	lastTrafficUpdate time.Time
 	cacheLock         sync.Mutex
 )
+
+var ErrTimeout = errors.New("request timed out")
 
 func getSystemInfo(client *hcloud.Client, serverID int, shouldCheckTraffic bool) (*SystemInfo, error) {
 	info := &SystemInfo{}
@@ -91,9 +94,15 @@ func getSystemInfo(client *hcloud.Client, serverID int, shouldCheckTraffic bool)
 				return
 			}
 
-			server, _, err := client.Server.GetByID(context.Background(), int64(serverID))
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			server, _, err := client.Server.GetByID(ctx, int64(serverID))
 			if err != nil {
 				log.Printf("Error getting server data from Hetzner: %v", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					err = ErrTimeout
+				}
 				return
 			}
 			if server != nil && server.IncludedTraffic > 0 {
@@ -131,7 +140,11 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		info, err := getSystemInfo(client, serverID, shouldCheckTraffic)
 		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			if errors.Is(err, ErrTimeout) {
+				http.Error(w, "Gateway Timeout", http.StatusGatewayTimeout)
+			} else {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
 			return
 		}
 
